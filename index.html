@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Corazón 3D - Te Amo</title>
+<style>
+    body { margin:0; background:#000; overflow:hidden; }
+</style>
+</head>
+<body>
+<div id="container"></div>
+
+<script type="module">
+import * as THREE from "https://unpkg.com/three@0.150.0/build/three.module.js";
+import { OrbitControls } from "https://unpkg.com/three@0.150.0/examples/jsm/controls/OrbitControls.js";
+import { FontLoader } from "https://unpkg.com/three@0.150.0/examples/jsm/loaders/FontLoader.js";
+import { TextGeometry } from "https://unpkg.com/three@0.150.0/examples/jsm/geometries/TextGeometry.js";
+
+/* === ESCENA, CÁMARA, RENDER === */
+const container = document.getElementById("container");
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 0.1, 100);
+camera.position.set(0,0,7);
+
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+container.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+
+/* === LUCES === */
+scene.add(new THREE.AmbientLight(0xff2a2a,0.4));
+const l1 = new THREE.PointLight(0xff0033,2,20);
+l1.position.set(3,3,4);
+scene.add(l1);
+
+/* === CORAZÓN 3D === */
+function shapeHeart(){
+    const h = new THREE.Shape();
+    h.moveTo(0,1);
+    h.bezierCurveTo(-1.2,1.8,-2,0.8,-1.6,0);
+    h.bezierCurveTo(-1.2,-1, -0.3,-1.3, 0,-0.7);
+    h.bezierCurveTo(0.3,-1.3, 1.2,-1,1.6,0);
+    h.bezierCurveTo(2,0.8,1.2,1.8,0,1);
+    return h;
+}
+
+const extrude = {
+    steps:20, depth:0.4,
+    bevelEnabled:true, bevelThickness:0.05,
+    bevelSize:0.06, bevelSegments:6
+};
+
+const geoHeart = new THREE.ExtrudeGeometry(shapeHeart(), extrude);
+geoHeart.center();
+
+const matHeart = new THREE.MeshStandardMaterial({
+    color:0xff003c,
+    metalness:0.3,
+    roughness:0.2,
+    emissive:0xff0033,
+    emissiveIntensity:0.5
+});
+
+const heart = new THREE.Mesh(geoHeart, matHeart);
+scene.add(heart);
+
+/* === TEXTO “te amo” === */
+const loader = new FontLoader();
+loader.load("https://unpkg.com/three@0.150.0/examples/fonts/helvetiker_regular.typeface.json",
+font=>{
+    const geoTxt = new TextGeometry("te amo",{
+        font:font,
+        size:0.4,
+        height:0.05,
+        bevelEnabled:true,
+        bevelThickness:0.01,
+        bevelSize:0.01
+    });
+    geoTxt.center();
+    const matTxt = new THREE.MeshStandardMaterial({
+        color:0xffffff,
+        emissive:0xff0066,
+        emissiveIntensity:0.4
+    });
+    const txt = new THREE.Mesh(geoTxt,matTxt);
+    txt.position.z = 0.25;
+    txt.position.y = -0.1;
+    scene.add(txt);
+});
+
+/* === CONFETI DE CORAZONES === */
+const confeti = [];
+function crearConfeti(){
+    const shape = shapeHeart();
+    const geo = new THREE.ShapeGeometry(shape);
+
+    for(let i=0;i<80;i++){
+        const mat = new THREE.MeshBasicMaterial({
+            color: Math.random()>0.5 ? 0xff6699 : 0xff0000
+        });
+        const c = new THREE.Mesh(geo,mat);
+        c.scale.set(0.12,0.12,0.12);
+        c.position.set(
+            (Math.random()-0.5)*8,
+            (Math.random()-0.5)*8,
+            (Math.random()-0.5)*4
+        );
+        scene.add(c);
+        confeti.push(c);
+    }
+}
+crearConfeti();
+
+/* === MUÑEQUITOS ANIMADOS (DIBUJO SIMPLE) === */
+const muñecos = new THREE.Group();
+function crearParejita(){
+    const geo = new THREE.CircleGeometry(0.35,32);
+    const pink = new THREE.MeshBasicMaterial({color:0xff7799});
+    const blue = new THREE.MeshBasicMaterial({color:0x77aaff});
+
+    const girl = new THREE.Mesh(geo,pink);
+    const boy = new THREE.Mesh(geo,blue);
+
+    girl.position.x = -0.5;
+    boy.position.x = 0.5;
+
+    muñecos.add(girl);
+    muñecos.add(boy);
+    muñecos.visible = false;
+
+    scene.add(muñecos);
+}
+crearParejita();
+
+/* === ANIMACIÓN PRINCIPAL === */
+let tiempo = 0;
+const clock = new THREE.Clock();
+
+function animar(){
+    requestAnimationFrame(animar);
+    const t = clock.getElapsedTime();
+    tiempo = t;
+
+    /* latido */
+    const s = 1 + 0.08*Math.sin(t*6);
+    heart.scale.set(s,s,s);
+
+    /* confeti cayendo */
+    confeti.forEach(c=>{
+        c.position.y -= 0.02;
+        c.rotation.z += 0.05;
+        if(c.position.y < -4) c.position.y = 4;
+    });
+
+    /* DESHACER CORAZÓN */
+    if(t > 8 && t < 13){
+        heart.material.opacity = 1 - (t-8)/5;
+        heart.material.transparent = true;
+        heart.rotation.y += 0.02;
+    }
+
+    /* MOSTRAR MUÑEQUITOS */
+    if(t >= 13){
+        heart.visible = false;
+        muñecos.visible = true;
+        muñecos.scale.set(1+0.05*Math.sin(t*4), 1+0.05*Math.sin(t*4),1);
+        muñecos.rotation.z = 0.08*Math.sin(t*2);
+    }
+
+    controls.update();
+    renderer.render(scene, camera);
+}
+
+animar();
+
+/* RESPONSIVE */
+onresize = () => {
+    camera.aspect = innerWidth/innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+};
+
+</script>
+</body>
+</html>
